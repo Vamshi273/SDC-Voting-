@@ -1,2 +1,0 @@
-# SDC-Voting-
-Avi
