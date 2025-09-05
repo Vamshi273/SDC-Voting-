@@ -23,6 +23,7 @@ h2 {margin-top:40px;text-align:center;font-size:2.2em;text-decoration:underline;
 background: linear-gradient(45deg,#ff6b6b,#feca57,#1dd1a1);background-size:300% 300%;animation: btnGradient 5s ease infinite;transition: transform 0.2s;}
 .vote-btn:hover {transform: scale(1.1);}
 @keyframes btnGradient {0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+.vote-btn:disabled {background:#888;cursor:not-allowed;}
 #resultsModal {display:none;position:fixed;top:0;left:0;width:100%;height:100%;background: rgba(0,0,0,0.9);overflow:auto;}
 #resultsContent {background:#fff;color:#000;margin:5% auto;padding:20px;width:90%;max-width:600px;border-radius:12px;}
 .close-btn {float:right;cursor:pointer;font-size:20px;}
@@ -47,7 +48,7 @@ background: linear-gradient(45deg,#ff6b6b,#feca57,#1dd1a1);background-size:300% 
 </div>
 
 <script>
-const API_URL = "https://saptarang-vote.onrender.com"; // change to your backend Render URL
+const API_URL = "https://sdc-vote-backend.onrender.com"; // <-- Replace with your backend URL
 const adminPassword = "saptarang123";
 
 const males = [
@@ -63,7 +64,6 @@ const females = [
   {name:"Samantha", img:"samantha-ruth-prabhu-stills-photos-pictures-2008.jpg"}
 ];
 
-// Render candidate cards
 function renderCards(){
   const mrContainer = document.getElementById('mrCards'); mrContainer.innerHTML='';
   males.forEach((c,i)=>{
@@ -72,6 +72,7 @@ function renderCards(){
       <button class="vote-btn" onclick="vote('males',${i})">Vote</button>`;
     mrContainer.appendChild(card);
   });
+
   const mrsContainer = document.getElementById('mrsCards'); mrsContainer.innerHTML='';
   females.forEach((c,i)=>{
     const card=document.createElement('div'); card.className='card';
@@ -81,45 +82,42 @@ function renderCards(){
   });
 }
 
-// Vote function (POST to backend)
 function vote(group,index){
   fetch(`${API_URL}/vote`, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ group, index })
+    method:"POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({group,index})
   })
-  .then(res => res.json())
-  .then(data => {
-    alert("Vote submitted!");
-  })
-  .catch(err => alert("Error: " + err));
+  .then(res=>res.json())
+  .then(()=> alert("Vote submitted!"))
+  .catch(err=> alert("Error: "+err));
 }
 
-// Show results (GET from backend)
 function toggleResults(){
-  const pass=prompt("Enter admin password to view results:");
-  if(pass!==adminPassword){ alert("Wrong password!"); return;}
+  const pass = prompt("Enter admin password:");
+  if(pass !== adminPassword){ alert("Wrong password!"); return; }
   fetch(`${API_URL}/results`)
-    .then(res => res.json())
-    .then(data => {
-      const list=document.getElementById('resultsList'); list.innerHTML='';
-      males.forEach((m,i)=>{ const li=document.createElement('li'); li.textContent=`${m.name} (Mr.): ${data.males[i]} votes`; list.appendChild(li);});
-      females.forEach((f,i)=>{ const li=document.createElement('li'); li.textContent=`${f.name} (Mrs.): ${data.females[i]} votes`; list.appendChild(li);});
-      document.getElementById('resultsModal').style.display='block';
+    .then(res=>res.json())
+    .then(data=>{
+      const list = document.getElementById("resultsList");
+      list.innerHTML = "";
+      data.males.forEach((v,i)=> list.innerHTML+=`<li>${males[i].name} (Mr.): ${v} votes</li>`);
+      data.females.forEach((v,i)=> list.innerHTML+=`<li>${females[i].name} (Mrs.): ${v} votes</li>`);
+      document.getElementById("resultsModal").style.display="block";
     });
 }
 
-// Reset votes (POST to backend)
 function resetVotes(){
-  const pass=prompt("Enter admin password to reset votes:");
-  if(pass!==adminPassword){ alert("Wrong password!"); return;}
+  const pass = prompt("Enter admin password:");
+  if(pass !== adminPassword){ alert("Wrong password!"); return; }
   fetch(`${API_URL}/reset`, {method:"POST"})
-    .then(res => res.json())
-    .then(data => {
-      alert("Votes reset!");
-      document.getElementById('resultsModal').style.display='none';
-    });
+    .then(()=> alert("Votes reset!"))
+    .catch(err=> alert("Error: "+err));
 }
+
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='R'||e.key==='r') toggleResults();
+});
 
 renderCards();
 </script>
