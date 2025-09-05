@@ -23,7 +23,6 @@ h2 {margin-top:40px;text-align:center;font-size:2.2em;text-decoration:underline;
 background: linear-gradient(45deg,#ff6b6b,#feca57,#1dd1a1);background-size:300% 300%;animation: btnGradient 5s ease infinite;transition: transform 0.2s;}
 .vote-btn:hover {transform: scale(1.1);}
 @keyframes btnGradient {0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
-.vote-btn:disabled {background:#888;cursor:not-allowed;}
 #resultsModal {display:none;position:fixed;top:0;left:0;width:100%;height:100%;background: rgba(0,0,0,0.9);overflow:auto;}
 #resultsContent {background:#fff;color:#000;margin:5% auto;padding:20px;width:90%;max-width:600px;border-radius:12px;}
 .close-btn {float:right;cursor:pointer;font-size:20px;}
@@ -40,15 +39,15 @@ background: linear-gradient(45deg,#ff6b6b,#feca57,#1dd1a1);background-size:300% 
 
 <div id="resultsModal">
   <div id="resultsContent">
-    <span class="close-btn" onclick="toggleResults()">&times;</span>
+    <span class="close-btn" onclick="document.getElementById('resultsModal').style.display='none'">&times;</span>
     <h2>Voting Results</h2>
     <ul id="resultsList"></ul>
     <button onclick="resetVotes()">Reset Votes</button>
-    <button onclick="forceResetVotes()">Force Reset Votes</button>
   </div>
 </div>
 
 <script>
+const API_URL = "https://saptarang-vote.onrender.com"; // change to your backend Render URL
 const adminPassword = "saptarang123";
 
 const males = [
@@ -64,91 +63,65 @@ const females = [
   {name:"Samantha", img:"samantha-ruth-prabhu-stills-photos-pictures-2008.jpg"}
 ];
 
-// Load votes or initialize
-let votes = JSON.parse(localStorage.getItem('votes')) || {males:Array(males.length).fill(0), females:Array(females.length).fill(0)};
-let locked = JSON.parse(localStorage.getItem('locked')) || false;
-
 // Render candidate cards
 function renderCards(){
-  const voted = localStorage.getItem('voted')==='true';
   const mrContainer = document.getElementById('mrCards'); mrContainer.innerHTML='';
   males.forEach((c,i)=>{
     const card=document.createElement('div'); card.className='card';
     card.innerHTML=`<img src="${c.img}" alt="${c.name}"><h3>${c.name}</h3>
-      <button class="vote-btn" onclick="vote('males',${i})" ${locked||voted?'disabled':''}>Vote</button>`;
+      <button class="vote-btn" onclick="vote('males',${i})">Vote</button>`;
     mrContainer.appendChild(card);
   });
   const mrsContainer = document.getElementById('mrsCards'); mrsContainer.innerHTML='';
   females.forEach((c,i)=>{
     const card=document.createElement('div'); card.className='card';
     card.innerHTML=`<img src="${c.img}" alt="${c.name}"><h3>${c.name}</h3>
-      <button class="vote-btn" onclick="vote('females',${i})" ${locked||voted?'disabled':''}>Vote</button>`;
+      <button class="vote-btn" onclick="vote('females',${i})">Vote</button>`;
     mrsContainer.appendChild(card);
   });
 }
 
-// Vote function
+// Vote function (POST to backend)
 function vote(group,index){
-  if(localStorage.getItem('voted')){ alert('You have already voted!'); return;}
-  votes[group][index]++;
-  localStorage.setItem('votes',JSON.stringify(votes));
-  localStorage.setItem('voted','true');
-  alert('Vote submitted!');
-  renderCards();
+  fetch(`${API_URL}/vote`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ group, index })
+  })
+  .then(res => res.json())
+  .then(data => {
+    alert("Vote submitted!");
+  })
+  .catch(err => alert("Error: " + err));
 }
 
-// Admin-only results
+// Show results (GET from backend)
 function toggleResults(){
   const pass=prompt("Enter admin password to view results:");
   if(pass!==adminPassword){ alert("Wrong password!"); return;}
-  const list=document.getElementById('resultsList'); list.innerHTML='';
-  males.forEach((m,i)=>{ const li=document.createElement('li'); li.textContent=`${m.name} (Mr.): ${votes.males[i]} votes`; list.appendChild(li);});
-  females.forEach((f,i)=>{ const li=document.createElement('li'); li.textContent=`${f.name} (Mrs.): ${votes.females[i]} votes`; list.appendChild(li);});
-  document.getElementById('resultsModal').style.display='block';
+  fetch(`${API_URL}/results`)
+    .then(res => res.json())
+    .then(data => {
+      const list=document.getElementById('resultsList'); list.innerHTML='';
+      males.forEach((m,i)=>{ const li=document.createElement('li'); li.textContent=`${m.name} (Mr.): ${data.males[i]} votes`; list.appendChild(li);});
+      females.forEach((f,i)=>{ const li=document.createElement('li'); li.textContent=`${f.name} (Mrs.): ${data.females[i]} votes`; list.appendChild(li);});
+      document.getElementById('resultsModal').style.display='block';
+    });
 }
 
-// Reset votes
+// Reset votes (POST to backend)
 function resetVotes(){
   const pass=prompt("Enter admin password to reset votes:");
   if(pass!==adminPassword){ alert("Wrong password!"); return;}
-  if(confirm("Reset all votes?")){
-    votes={males:Array(males.length).fill(0), females:Array(females.length).fill(0)};
-    localStorage.setItem('votes',JSON.stringify(votes));
-    localStorage.removeItem('voted'); // allow all users to vote again
-    locked=false; localStorage.setItem('locked',JSON.stringify(locked));
-    alert("Votes reset! Everyone can vote again.");
-    renderCards();
-  }
+  fetch(`${API_URL}/reset`, {method:"POST"})
+    .then(res => res.json())
+    .then(data => {
+      alert("Votes reset!");
+      document.getElementById('resultsModal').style.display='none';
+    });
 }
-
-// Force reset
-function forceResetVotes(){
-  const pass=prompt("Enter admin password to force reset:");
-  if(pass!==adminPassword){ alert("Wrong password!"); return;}
-  localStorage.clear();
-  votes={males:Array(males.length).fill(0), females:Array(females.length).fill(0)};
-  locked=false;
-  alert("Force reset complete! Everyone can vote again.");
-  renderCards();
-}
-
-// Lock/unlock voting
-function toggleLock(){
-  const pass=prompt("Enter admin password to lock/unlock voting:");
-  if(pass!==adminPassword){ alert("Wrong password!"); return;}
-  locked=!locked;
-  localStorage.setItem('locked',JSON.stringify(locked));
-  alert(locked?"Voting is now LOCKED":"Voting is now UNLOCKED");
-  renderCards();
-}
-
-document.addEventListener('keydown',(e)=>{
-  if(e.key==='R'||e.key==='r') toggleResults();
-  if(e.ctrlKey && e.altKey && e.key==='r') resetVotes();
-  if(e.key==='L'||e.key==='l') toggleLock();
-});
 
 renderCards();
 </script>
 </body>
-  </html>!
+</html>
